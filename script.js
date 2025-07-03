@@ -36,15 +36,23 @@ function renderizarGrupos() {
   }
   grupos.forEach((grupo, idx) => {
     const selected = idx === grupoActualIdx ? 'selected' : '';
+    const fechaHora = grupo.hora ? `${grupo.fecha} ${grupo.hora}` : grupo.fecha;
     const html = `<div class="grupo-item ${selected}" data-idx="${idx}">
       <span class="grupo-link-icon" data-link="${grupo.link}" title="Copiar enlace del grupo">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;cursor:pointer;"><path d="M7.5 12.5L12.5 7.5M8.75 6.25L6.25 8.75C4.75 10.25 4.75 12.75 6.25 14.25C7.75 15.75 10.25 15.75 11.75 14.25L14.25 11.75C15.75 10.25 15.75 7.75 14.25 6.25C12.75 4.75 10.25 4.75 8.75 6.25Z" stroke="#128c7e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <span class="grupo-nombre">${grupo.nombre}</span>
-      <span class="grupo-fecha">${grupo.fecha}</span>
+      <span class="grupo-fecha">${fechaHora}</span>
     </div>`;
     lista.append(html);
   });
+}
+
+// Incluye la librería QRCode.js si no está ya
+if (!window.QRCode) {
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  document.head.appendChild(script);
 }
 
 function renderizarGrupoSeleccionado() {
@@ -56,15 +64,35 @@ function renderizarGrupoSeleccionado() {
   }
   const grupos = obtenerGrupos();
   const grupo = grupos[grupoActualIdx];
-  // Formulario para nueva predicción
-  const form = `<form id="nueva-prediccion-form">
-    <div style="font-weight:bold;font-size:1.1em;color:#075e54;text-align:center;margin-bottom:8px;">${grupo.nombre} (${grupo.fecha})</div>
-    <label for="nombre-persona">Tu nombre:</label>
-    <input type="text" id="nombre-persona" name="nombre-persona" maxlength="30" required>
-    <label for="texto-prediccion">Predicción (máx 100 caracteres):</label>
-    <input type="text" id="texto-prediccion" name="texto-prediccion" maxlength="100" required>
-    <button type="submit">Agregar predicción</button>
+  const fechaHora = grupo.hora ? `${grupo.fecha} ${grupo.hora}` : grupo.fecha;
+  // QR del link del grupo
+  const qrDiv = $('<div id="grupo-link-qr" style="display:flex;flex-direction:column;align-items:center;margin-bottom:12px;"></div>');
+  qrDiv.append(`<div style="font-size:0.98em;color:#128c7e;margin-bottom:4px;">Enlace del grupo:</div>`);
+  qrDiv.append(`<div id="qr-canvas"></div>`);
+  cont.append(qrDiv);
+  // Espera a que la librería QRCode esté cargada
+  (function waitForQR(){
+    if (window.QRCode) {
+      $('#qr-canvas').empty();
+      new QRCode(document.getElementById('qr-canvas'), {
+        text: grupo.link,
+        width: 120,
+        height: 120,
+        colorDark : '#075e54',
+        colorLight : '#fff',
+        correctLevel : QRCode.CorrectLevel.H
+      });
+    } else {
+      setTimeout(waitForQR, 100);
+    }
+  })();
+  // Formulario horizontal para nueva predicción
+  const form = `<form id="nueva-prediccion-form" class="prediccion-horizontal">
+    <input type="text" id="nombre-persona" name="nombre-persona" maxlength="30" required placeholder="Tu nombre">
+    <input type="text" id="texto-prediccion" name="texto-prediccion" maxlength="100" required placeholder="Predicción (máx 100)">
+    <button type="submit">Agregar</button>
   </form>`;
+  cont.append(`<div style="font-weight:bold;font-size:1.1em;color:#075e54;text-align:center;margin-bottom:8px;">${grupo.nombre} (${fechaHora})</div>`);
   cont.append(form);
   // Lista de predicciones
   const lista = $('<div id="lista-predicciones-main"></div>');
@@ -85,17 +113,44 @@ function renderizarGrupoSeleccionado() {
 }
 
 $(document).ready(function() {
+  // --- Manejo de hash para cargar grupo desde link ---
+  function cargarGrupoDesdeHash() {
+    const hash = window.location.hash;
+    if (hash.startsWith('#grupo=')) {
+      const data = hash.replace('#grupo=', '');
+      const grupo = decodificarGrupo(data);
+      if (!grupo || !grupo.nombre || !grupo.fecha) return;
+      let grupos = obtenerGrupos();
+      // Buscar si ya existe por hash
+      const hashActual = codificarGrupo(grupo);
+      let idx = grupos.findIndex(g => g.hash === hashActual);
+      if (idx === -1) {
+        // No existe, lo agregamos
+        grupo.hash = hashActual;
+        grupo.link = `${window.location.origin}${window.location.pathname}#grupo=${hashActual}`;
+        grupos.push(grupo);
+        guardarGrupos(grupos);
+        idx = grupos.length - 1;
+      }
+      grupoActualIdx = idx;
+      renderizarGrupos();
+      renderizarGrupoSeleccionado();
+    }
+  }
+
   renderizarGrupos();
   renderizarGrupoSeleccionado();
+  cargarGrupoDesdeHash();
 
   // Crear grupo
   $('#grupo-form').on('submit', function(e) {
     e.preventDefault();
     const fecha = $('#fecha').val();
+    const hora = $('#hora').val();
     const nombre = $('#nombre-grupo').val().trim();
-    if (!fecha || !nombre) return;
+    if (!fecha || !hora || !nombre) return;
     if (nombre.length > 100) return;
-    const grupoObj = { fecha, nombre, predicciones: [] };
+    const grupoObj = { fecha, hora, nombre, predicciones: [] };
     const hash = codificarGrupo(grupoObj);
     const link = `${window.location.origin}${window.location.pathname}#grupo=${hash}`;
     grupoObj.link = link;
@@ -146,7 +201,7 @@ $(document).ready(function() {
     if (!grupo.predicciones) grupo.predicciones = [];
     grupo.predicciones.push({ nombre, prediccion });
     // Actualizar link y hash del grupo
-    const nuevoHash = codificarGrupo({ fecha: grupo.fecha, nombre: grupo.nombre, predicciones: grupo.predicciones });
+    const nuevoHash = codificarGrupo({ fecha: grupo.fecha, hora: grupo.hora, nombre: grupo.nombre, predicciones: grupo.predicciones });
     const nuevoLink = `${window.location.origin}${window.location.pathname}#grupo=${nuevoHash}`;
     grupo.hash = nuevoHash;
     grupo.link = nuevoLink;

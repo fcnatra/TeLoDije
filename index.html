@@ -13,7 +13,10 @@
       <h1>TeLoDije</h1>
       <form id="grupo-form">
         <label for="fecha">Fecha objetivo de la predicción:</label>
-        <input type="date" id="fecha" name="fecha" required>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="date" id="fecha" name="fecha" required>
+          <input type="time" id="hora" name="hora" required>
+        </div>
         <label for="nombre-grupo">Nombre del grupo (máx 100 caracteres):</label>
         <input type="text" id="nombre-grupo" name="nombre-grupo" maxlength="100" required>
         <button type="submit">Crear grupo</button>
