@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TeLoDije - Predicciones</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <h1>TeLoDije</h1>
+      <form id="grupo-form">
+        <label for="fecha">Fecha objetivo de la predicción:</label>
+        <input type="date" id="fecha" name="fecha" required>
+        <label for="nombre-grupo">Nombre del grupo (máx 100 caracteres):</label>
+        <input type="text" id="nombre-grupo" name="nombre-grupo" maxlength="100" required>
+        <button type="submit">Crear grupo</button>
+      </form>
+      <div id="grupos-lista">
+        <!-- Aquí irán los grupos -->
+      </div>
+    </aside>
+    <main class="main-view">
+      <div id="grupo-seleccionado">
+        <!-- Aquí se mostrará el grupo seleccionado y sus predicciones -->
+      </div>
+    </main>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html> 
